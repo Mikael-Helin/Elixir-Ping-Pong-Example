@@ -11,6 +11,10 @@ defmodule PingPong do
     IO.puts("Starting main.exs in container #{container_name}")
     IO.puts("Current Node: #{inspect(Node.self())}")
 
+    # Register the process once
+    Process.register(self(), :ping_pong_process)
+    IO.puts("Process registered as :ping_pong_process")
+
     # Connect to other nodes
     connect_to_other_nodes()
     # Wait for connections to establish
@@ -23,26 +27,20 @@ defmodule PingPong do
       do_send_random(initial_number)
     else
       IO.puts("Container #{container_name} is waiting to receive a number.")
-      do_listen()
     end
 
-    # Keep the process running
-    :timer.sleep(:infinity)
+    # Start listening
+    do_listen()
   end
 
   defp connect_to_other_nodes do
     for i <- 1..@total_nodes do
-      node_name = :"node_#{i}@#{node_host()}"
+      node_name = :"node_#{i}@ping_pong"
       unless node_name == Node.self() do
         IO.puts("Attempting to connect to #{inspect(node_name)}")
         Node.connect(node_name)
       end
     end
-  end
-
-  defp node_host do
-    # Since we're using short names, host is the same for all nodes
-    :net_adm.localhost()
   end
 
   def do_send_random(number) do
@@ -56,8 +54,8 @@ defmodule PingPong do
       do_send_random(number)
     else
       target_node = Enum.random(nodes)
-      IO.puts("Container #{container_name} sending number #{number} to #{inspect(target_node)}")
-      send({__MODULE__, target_node}, {:ping, number})
+      IO.puts("Container #{container_name} sending number #{number} to :ping_pong_process@#{inspect(target_node)}")
+      send({:ping_pong_process, target_node}, {:ping, number})
     end
   end
 
@@ -70,10 +68,10 @@ defmodule PingPong do
         Process.sleep(@delay)
         do_send_random(increment(number))
         do_listen()
-    after
-      5000 ->
-        IO.puts("No messages received in the last 5 seconds.")
-        do_listen()
+      after
+        5000 ->
+          IO.puts("No messages received in the last 5 seconds.")
+          do_listen()
     end
   end
 
