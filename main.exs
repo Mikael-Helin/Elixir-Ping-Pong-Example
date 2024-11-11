@@ -4,11 +4,18 @@ defmodule PingPong do
   """
   @max_number 10
   @delay 1000
+  @total_nodes 3  # Adjust this number based on the total number of nodes
 
   def start(initial_number \\ 1) do
     container_name = System.get_env("CONTAINER_NAME")
     IO.puts("Starting main.exs in container #{container_name}")
     IO.puts("Current Node: #{inspect(Node.self())}")
+
+    # Connect to other nodes
+    connect_to_other_nodes()
+    # Wait for connections to establish
+    Process.sleep(2000)
+
     IO.puts("Available nodes: #{inspect(Node.list())}")
 
     if container_name == "ping_pong_container_1" do
@@ -21,6 +28,21 @@ defmodule PingPong do
 
     # Keep the process running
     :timer.sleep(:infinity)
+  end
+
+  defp connect_to_other_nodes do
+    for i <- 1..@total_nodes do
+      node_name = :"node_#{i}@#{node_host()}"
+      unless node_name == Node.self() do
+        IO.puts("Attempting to connect to #{inspect(node_name)}")
+        Node.connect(node_name)
+      end
+    end
+  end
+
+  defp node_host do
+    # Since we're using short names, host is the same for all nodes
+    :net_adm.localhost()
   end
 
   def do_send_random(number) do
