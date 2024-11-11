@@ -17,28 +17,43 @@ defmodule PingPong do
 
     # Connect to other nodes
     connect_to_other_nodes()
+
     # Wait for connections to establish
     Process.sleep(2000)
-
     IO.puts("Available nodes: #{inspect(Node.list())}")
 
-    if container_name == "ping_pong_container_1" do
+    # Check if this container is the initiator and start the game
+    if container_name == "ping_pong_1_1" do
       IO.puts("Container #{container_name} is initiating the game with number #{initial_number}")
       do_send_random(initial_number)
     else
       IO.puts("Container #{container_name} is waiting to receive a number.")
     end
 
-    # Start listening
+    # Start listening for incoming messages
     do_listen()
   end
 
   defp connect_to_other_nodes do
-    for i <- 1..@total_nodes do
-      node_name = :"node_#{i}@ping_pong"
-      unless node_name == Node.self() do
-        IO.puts("Attempting to connect to #{inspect(node_name)}")
-        Node.connect(node_name)
+    total_pods = System.get_env("NUM_PODS") |> String.to_integer()
+    containers_per_pod = System.get_env("NUM_CONTAINERS") |> String.to_integer()
+
+    Process.sleep(2000)  # Delay to allow nodes to initialize
+
+    # Dynamically generate node names
+    nodes = for pod_num <- 1..total_pods, container_num <- 1..containers_per_pod do
+      :"ping_pong_#{pod_num}_#{container_num}@ping_pong_#{pod_num}"
+    end
+
+
+    for node <- nodes do
+      unless node == Node.self() do
+        IO.puts("Attempting to connect to #{inspect(node)}")
+        Node.connect(node)
+        case Node.ping(node) do
+          :pong -> IO.puts("Successfully connected to #{inspect(node)}")
+          :pang -> IO.puts("Failed to connect to #{inspect(node)}")
+        end
       end
     end
   end
@@ -48,9 +63,8 @@ defmodule PingPong do
     container_name = System.get_env("CONTAINER_NAME")
 
     if nodes == [] do
-      IO.puts("No other nodes available to send number #{number} from #{container_name}.")
-      # Wait and retry
-      Process.sleep(2000)
+      IO.puts("No other nodes available to send number #{number} from #{container_name}. Retrying in 5 seconds.")
+      Process.sleep(5000)
       do_send_random(number)
     else
       target_node = Enum.random(nodes)
