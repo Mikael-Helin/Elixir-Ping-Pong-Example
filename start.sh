@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Not loading shared.sh because it is not needed
+
 # Check for required environment variables
 if [ -z "$NODE_NAME" ] || [ -z "$COOKIE" ]; then
   echo "NODE_NAME and COOKIE environment variables must be set"
@@ -11,3 +13,5 @@ cd /opt/app || exit
 
 # Start the Elixir node with a short name
 elixir --sname "$NODE_NAME" --cookie "$COOKIE" main.exs
+
+cd "$BIN_DIR"
