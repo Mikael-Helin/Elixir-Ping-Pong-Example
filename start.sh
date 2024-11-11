@@ -6,5 +6,8 @@ if [ -z "$NODE_NAME" ] || [ -z "$COOKIE" ]; then
   exit 1
 fi
 
-# Start the Elixir node
-elixir --name "$NODE_NAME" --cookie "$COOKIE" main.exs
+# Change to the directory where main.exs is located
+cd /opt/app || exit
+
+# Start the Elixir node with a short name
+elixir --sname "$NODE_NAME" --cookie "$COOKIE" main.exs

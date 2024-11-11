@@ -1,41 +1,57 @@
 defmodule PingPong do
   @moduledoc """
-  A distributed Ping-Pong game where a number is passed between containers, incrementing each time.
+  A distributed Ping-Pong game where a number is passed between containers.
   """
-
   @max_number 10
-  @delay 1000  # 1-second delay
+  @delay 1000
 
   def start(initial_number \\ 1) do
-    # Only start the game from container 1
-    if System.get_env("CONTAINER_NAME") == "elixir_container_1" do
-      send_random(initial_number)
+    container_name = System.get_env("CONTAINER_NAME")
+    IO.puts("Starting main.exs in container #{container_name}")
+    IO.puts("Current Node: #{inspect(Node.self())}")
+    IO.puts("Available nodes: #{inspect(Node.list())}")
+
+    if container_name == "ping_pong_container_1" do
+      IO.puts("Container #{container_name} is initiating the game with number #{initial_number}")
+      do_send_random(initial_number)
     else
-      listen()
+      IO.puts("Container #{container_name} is waiting to receive a number.")
+      do_listen()
+    end
+
+    # Keep the process running
+    :timer.sleep(:infinity)
+  end
+
+  def do_send_random(number) do
+    nodes = Node.list()
+    container_name = System.get_env("CONTAINER_NAME")
+
+    if nodes == [] do
+      IO.puts("No other nodes available to send number #{number} from #{container_name}.")
+      # Wait and retry
+      Process.sleep(2000)
+      do_send_random(number)
+    else
+      target_node = Enum.random(nodes)
+      IO.puts("Container #{container_name} sending number #{number} to #{inspect(target_node)}")
+      send({__MODULE__, target_node}, {:ping, number})
     end
   end
 
-  defp listen do
+  def do_listen do
+    IO.puts("Listening for messages...")
     receive do
       {:ping, number} ->
-        IO.puts("Container #{Node.self()} received number #{number}")
+        container_name = System.get_env("CONTAINER_NAME")
+        IO.puts("Container #{container_name} received number #{number}")
         Process.sleep(@delay)
-        send_random(increment(number))
-        listen()
-    end
-  end
-
-  defp send_random(number) do
-    # Get list of all nodes, excluding itself
-    nodes = Node.list() |> Enum.reject(&(&1 == Node.self()))
-    if nodes == [] do
-      IO.puts("No other containers to send to.")
-    else
-      # Select a random node to send the message
-      target_node = Enum.random(nodes)
-      IO.puts("Container #{Node.self()} sending #{number} to #{target_node}")
-      Node.spawn(target_node, __MODULE__, :listen, [])
-      send {target_node, __MODULE__}, {:ping, number}
+        do_send_random(increment(number))
+        do_listen()
+    after
+      5000 ->
+        IO.puts("No messages received in the last 5 seconds.")
+        do_listen()
     end
   end
 
